@@ -1,15 +1,15 @@
 // ===== SPOTIFY APP CONFIG =====
 // Get this from developer.spotify.com/dashboard -> your app -> Settings -> Client ID
-const SPOTIFY_CLIENT_ID = 'YOUR_CLIENT_ID_HERE';
+const SPOTIFY_CLIENT_ID = c65e047cf7114a79b9c140ffdf0f2f6b;
 // Must exactly match a Redirect URI registered in your Spotify app settings,
 // e.g. https://your-app.vercel.app/callback.html (or http://127.0.0.1:5500/callback.html for local testing)
-const REDIRECT_URI = 'YOUR_REDIRECT_URI_HERE';
+const REDIRECT_URI = https://auraspotify.vercel.app/;
 
 // NOTE: Spotify's standard token refresh endpoint requires a Client Secret.
 // For a pure client-side personal app there is no safe place to hide a secret —
 // this is a known, accepted tradeoff for a single-user personal tool only.
 // Get this from developer.spotify.com/dashboard -> your app -> Settings -> Client Secret
-const SPOTIFY_CLIENT_SECRET = 'YOUR_CLIENT_SECRET_HERE';
+const SPOTIFY_CLIENT_SECRET = 10b669b0131b4942b1e6add822dba332;
 
 const SCOPES = [
   'streaming',
