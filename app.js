@@ -319,9 +319,10 @@ function renderNowPlaying(isNewTrack) {
   const track = state.currentTrack;
   if (!track) return;
 
-  document.getElementById('trackTitle').textContent = track.name;
-  document.getElementById('trackArtist').textContent = track.artists;
-  document.getElementById('trackAlbum').textContent = track.album;
+  console.debug('[Aura] rendering now-playing track', track);
+  document.getElementById('trackTitle').textContent = track.name || 'Unknown Track';
+  document.getElementById('trackArtist').textContent = track.artists || 'Unknown Artist';
+  document.getElementById('trackAlbum').textContent = track.album || '';
 
   const titleEl = document.getElementById('trackTitle');
   const wrap = titleEl.parentElement;
