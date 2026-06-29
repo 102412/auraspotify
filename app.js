@@ -209,8 +209,52 @@ function handlePlayerStateChanged(playerState) {
   renderMiniPlayer();
   renderControlsState();
   startPositionTimer();
+  updateMediaSession(isNewTrack);
 
   if (state.currentView === 'queue') loadQueue();
+}
+
+// ===== MEDIA SESSION (Android/lock-screen now-playing) =====
+function updateMediaSession(isNewTrack) {
+  if (!('mediaSession' in navigator)) return;
+  const track = state.currentTrack;
+  if (!track) return;
+
+  if (isNewTrack) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.name,
+      artist: track.artists,
+      album: track.album,
+      artwork: track.albumArt
+        ? [
+            { src: track.albumArt, sizes: '64x64', type: 'image/jpeg' },
+            { src: track.albumArt, sizes: '128x128', type: 'image/jpeg' },
+            { src: track.albumArt, sizes: '256x256', type: 'image/jpeg' },
+            { src: track.albumArt, sizes: '512x512', type: 'image/jpeg' },
+          ]
+        : [],
+    });
+
+    navigator.mediaSession.setActionHandler('play', () => state.player?.resume());
+    navigator.mediaSession.setActionHandler('pause', () => state.player?.pause());
+    navigator.mediaSession.setActionHandler('previoustrack', () => state.player?.previousTrack());
+    navigator.mediaSession.setActionHandler('nexttrack', () => state.player?.nextTrack());
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details.seekTime != null) {
+        const seekMs = Math.round(details.seekTime * 1000);
+        spotifyFetch(`/me/player/seek?position_ms=${seekMs}`, { method: 'PUT' }).catch(() => {});
+      }
+    });
+  }
+
+  navigator.mediaSession.playbackState = state.isPlaying ? 'playing' : 'paused';
+  try {
+    navigator.mediaSession.setPositionState({
+      duration: state.duration / 1000,
+      playbackRate: 1,
+      position: Math.min(state.position / 1000, state.duration / 1000),
+    });
+  } catch (e) {}
 }
 
 // ===== NOW PLAYING RENDER =====
@@ -684,7 +728,10 @@ async function openLikedSongs() {
       tracks = tracks.concat(data.items || []);
       url = data.next ? data.next.replace('https://api.spotify.com/v1', '') : null;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('Failed to load liked songs', e);
+    showToast('Could not load Liked Songs');
+  }
 
   const playAllBtn = document.createElement('button');
   playAllBtn.className = 'glass-btn play-all-btn';
@@ -694,11 +741,12 @@ async function openLikedSongs() {
 
   tracks.forEach((item, idx) => {
     const track = item.track;
+    if (!track) return;
     const row = buildTrackRow(
       {
         name: track.name,
-        artists: track.artists.map((a) => a.name).join(' · '),
-        albumArt: track.album.images?.[0]?.url || '',
+        artists: (track.artists || []).map((a) => a.name).join(' · '),
+        albumArt: track.album?.images?.[0]?.url || '',
         durationMs: track.duration_ms,
       },
       false
@@ -720,14 +768,17 @@ async function openPlaylist(playlist) {
   }));
 
   let tracks = [];
-  let url = `/playlists/${playlist.id}/tracks?limit=100`;
+  let url = `/playlists/${playlist.id}/tracks?limit=100&market=from_token`;
   try {
     while (url) {
       const data = await spotifyFetch(url.replace('https://api.spotify.com/v1', ''));
       tracks = tracks.concat(data.items || []);
       url = data.next ? data.next.replace('https://api.spotify.com/v1', '') : null;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('Failed to load playlist tracks', e);
+    showToast('Could not load tracks for this playlist');
+  }
 
   const playAllBtn = document.createElement('button');
   playAllBtn.className = 'glass-btn play-all-btn';
@@ -741,7 +792,7 @@ async function openPlaylist(playlist) {
     const row = buildTrackRow(
       {
         name: track.name,
-        artists: track.artists.map((a) => a.name).join(' · '),
+        artists: (track.artists || []).map((a) => a.name).join(' · '),
         albumArt: track.album?.images?.[0]?.url || '',
         durationMs: track.duration_ms,
       },
