@@ -39,7 +39,56 @@ const state = {
   loadProfile();
   loadLibrary();
   registerServiceWorker();
+  startPlaybackPolling();
 })();
+
+// ===== WEB API PLAYBACK POLLING =====
+// The Web Playback SDK's player_state_changed event doesn't always fire reliably
+// (e.g. if playback started from another device before transferring to Aura), so
+// this polls the standard Web API as a dependable source of truth for now-playing data.
+function startPlaybackPolling() {
+  pollPlaybackState();
+  setInterval(pollPlaybackState, 3000);
+}
+
+async function pollPlaybackState() {
+  let data;
+  try {
+    data = await spotifyFetch('/me/player');
+  } catch (e) {
+    return;
+  }
+  if (!data || !data.item) return;
+
+  const track = data.item;
+  const isNewTrack = !state.currentTrack || state.currentTrack.id !== track.id;
+
+  state.isPlaying = data.is_playing;
+  state.position = data.progress_ms || 0;
+  state.duration = track.duration_ms;
+  state.shuffle = data.shuffle_state;
+  state.repeat = data.repeat_state || 'off';
+
+  state.currentTrack = {
+    id: track.id,
+    name: track.name,
+    artists: (track.artists || []).map((a) => a.name).join(' · '),
+    album: track.album?.name || '',
+    albumArt: track.album?.images?.[0]?.url || '',
+    albumImages: track.album?.images || [],
+    durationMs: track.duration_ms,
+  };
+
+  if (data.device?.id) state.deviceId = data.device.id;
+
+  renderNowPlaying(isNewTrack);
+  renderMiniPlayer();
+  renderControlsState();
+  startPositionTimer();
+  updateMediaSession(isNewTrack);
+
+  if (state.currentView === 'queue') loadQueue();
+}
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
@@ -84,8 +133,13 @@ async function spotifyFetch(path, options = {}) {
   }
 
   if (!response.ok && response.status !== 204) {
-    showToast('Something went wrong');
-    throw new Error(`Spotify API error ${response.status}`);
+    let detail = '';
+    try {
+      const errBody = await response.json();
+      detail = errBody?.error?.message || '';
+    } catch (e) {}
+    showToast(`Something went wrong${detail ? ': ' + detail : ''} (${response.status})`);
+    throw new Error(`Spotify API error ${response.status}${detail ? ': ' + detail : ''} for ${path}`);
   }
 
   if (response.status === 204) return null;
@@ -194,6 +248,7 @@ function handlePlayerStateChanged(playerState) {
     artists: track.artists.map((a) => a.name).join(' · '),
     album: track.album.name,
     albumArt: track.album.images[0]?.url || '',
+    albumImages: track.album.images || [],
     durationMs: track.duration_ms,
   };
 
@@ -221,18 +276,20 @@ function updateMediaSession(isNewTrack) {
   if (!track) return;
 
   if (isNewTrack) {
+    const images = track.albumImages && track.albumImages.length ? track.albumImages : (track.albumArt ? [{ url: track.albumArt }] : []);
+    const artwork = images
+      .filter((img) => img.url)
+      .map((img) => ({
+        src: img.url,
+        sizes: img.width && img.height ? `${img.width}x${img.height}` : '300x300',
+        type: 'image/jpeg',
+      }));
+
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.name,
       artist: track.artists,
       album: track.album,
-      artwork: track.albumArt
-        ? [
-            { src: track.albumArt, sizes: '64x64', type: 'image/jpeg' },
-            { src: track.albumArt, sizes: '128x128', type: 'image/jpeg' },
-            { src: track.albumArt, sizes: '256x256', type: 'image/jpeg' },
-            { src: track.albumArt, sizes: '512x512', type: 'image/jpeg' },
-          ]
-        : [],
+      artwork,
     });
 
     navigator.mediaSession.setActionHandler('play', () => state.player?.resume());
@@ -579,7 +636,7 @@ function buildSimpleRow(imgUrl, title, subtitle, isRound) {
 async function loadArtistTracks(artist) {
   let data;
   try {
-    data = await spotifyFetch(`/artists/${artist.id}/top-tracks?market=from_token`);
+    data = await spotifyFetch(`/artists/${artist.id}/top-tracks?market=${state.userMarket || 'US'}`);
   } catch (e) {
     return;
   }
@@ -768,7 +825,7 @@ async function openPlaylist(playlist) {
   }));
 
   let tracks = [];
-  let url = `/playlists/${playlist.id}/tracks?limit=100&market=from_token`;
+  let url = `/playlists/${playlist.id}/tracks?limit=100`;
   try {
     while (url) {
       const data = await spotifyFetch(url.replace('https://api.spotify.com/v1', ''));
@@ -819,6 +876,7 @@ async function loadProfile() {
   }
   document.getElementById('profileName').textContent = profile.display_name || profile.id;
   document.getElementById('profileAvatar').src = profile.images?.[0]?.url || '';
+  state.userMarket = profile.country || '';
   loadDevices();
 }
 
