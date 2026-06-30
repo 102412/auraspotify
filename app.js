@@ -788,8 +788,9 @@ async function openLikedSongs() {
     }
   } catch (e) {
     console.error('Failed to load liked songs', e);
-    showToast('Could not load Liked Songs');
+    showToast('Could not load Liked Songs: ' + e.message);
   }
+  showToast(`Loaded ${tracks.length} liked songs`);
 
   const playAllBtn = document.createElement('button');
   playAllBtn.className = 'glass-btn play-all-btn';
@@ -835,8 +836,9 @@ async function openPlaylist(playlist) {
     }
   } catch (e) {
     console.error('Failed to load playlist tracks', e);
-    showToast('Could not load tracks for this playlist');
+    showToast('Could not load tracks: ' + e.message);
   }
+  showToast(`Loaded ${tracks.length} playlist items`);
 
   const playAllBtn = document.createElement('button');
   playAllBtn.className = 'glass-btn play-all-btn';
