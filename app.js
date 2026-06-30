@@ -824,11 +824,24 @@ async function openPlaylist(playlist) {
       url = data.next ? data.next.replace('https://api.spotify.com/v1', '') : null;
     }
   } catch (e) {
-    console.error('Failed to load playlist tracks', e);
-    if (e.message.includes('403')) {
-      showToast("Spotify blocks track access for this playlist (likely an algorithmic one like Discover Weekly)");
-    } else {
-      showToast('Could not load tracks: ' + e.message);
+    console.error('Failed to load playlist tracks via /tracks endpoint, trying fallback', e);
+    // Fallback: fetch tracks embedded in the playlist object itself instead of the
+    // dedicated /tracks endpoint — Spotify sometimes handles permissions differently
+    // between the two for the same playlist.
+    try {
+      tracks = [];
+      let fallbackUrl = `/playlists/${playlist.id}?fields=tracks.items,tracks.next`;
+      let isFirstPage = true;
+      while (fallbackUrl) {
+        const data = await spotifyFetch(fallbackUrl.replace('https://api.spotify.com/v1', ''));
+        const tracksObj = isFirstPage ? data.tracks : data;
+        tracks = tracks.concat(tracksObj.items || []);
+        fallbackUrl = tracksObj.next ? tracksObj.next.replace('https://api.spotify.com/v1', '') : null;
+        isFirstPage = false;
+      }
+    } catch (fallbackError) {
+      console.error('Fallback also failed', fallbackError);
+      showToast('Could not load tracks: ' + fallbackError.message);
     }
   }
 
