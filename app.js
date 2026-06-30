@@ -780,7 +780,6 @@ async function openLikedSongs() {
     console.error('Failed to load liked songs', e);
     showToast('Could not load Liked Songs: ' + e.message);
   }
-  showToast(`Loaded ${tracks.length} liked songs`);
 
   const playAllBtn = document.createElement('button');
   playAllBtn.className = 'glass-btn play-all-btn';
@@ -826,9 +825,12 @@ async function openPlaylist(playlist) {
     }
   } catch (e) {
     console.error('Failed to load playlist tracks', e);
-    showToast('Could not load tracks: ' + e.message);
+    if (e.message.includes('403')) {
+      showToast("Spotify blocks track access for this playlist (likely an algorithmic one like Discover Weekly)");
+    } else {
+      showToast('Could not load tracks: ' + e.message);
+    }
   }
-  showToast(`Loaded ${tracks.length} playlist items`);
 
   const playAllBtn = document.createElement('button');
   playAllBtn.className = 'glass-btn play-all-btn';
