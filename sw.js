@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aura-shell-v1';
+const CACHE_NAME = 'aura-shell-v2';
 const SHELL_FILES = [
   '/app.html',
   '/index.html',
@@ -40,7 +40,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for the app shell
+  const isAppCode = /\.(html|js|css)$/.test(new URL(url).pathname) || new URL(url).pathname === '/';
+
+  if (isAppCode) {
+    // Network-first for our own code so fixes/deploys take effect immediately.
+    // Falls back to cache only when offline.
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok && event.request.method === 'GET') {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Cache-first for static assets (icons, fonts) that rarely change
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
