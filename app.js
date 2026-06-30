@@ -319,19 +319,9 @@ function renderNowPlaying(isNewTrack) {
   const track = state.currentTrack;
   if (!track) return;
 
-  console.debug('[Aura] rendering now-playing track', track);
   document.getElementById('trackTitle').textContent = track.name || 'Unknown Track';
   document.getElementById('trackArtist').textContent = track.artists || 'Unknown Artist';
   document.getElementById('trackAlbum').textContent = track.album || '';
-
-  const titleEl = document.getElementById('trackTitle');
-  const wrap = titleEl.parentElement;
-  titleEl.classList.remove('marquee');
-  requestAnimationFrame(() => {
-    if (titleEl.scrollWidth > wrap.clientWidth) {
-      titleEl.classList.add('marquee');
-    }
-  });
 
   if (isNewTrack) {
     const artEl = document.getElementById('albumArt');

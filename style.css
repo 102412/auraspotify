@@ -237,20 +237,13 @@ svg {
 
 .track-title {
   display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.3px;
   color: #ffffff;
-}
-
-.track-title.marquee {
-  animation: marquee 8s linear infinite;
-  padding-right: 40px;
-}
-
-@keyframes marquee {
-  0%, 10% { transform: translateX(0); }
-  90%, 100% { transform: translateX(-100%); }
 }
 
 .track-artist {
